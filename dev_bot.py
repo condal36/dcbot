@@ -5,7 +5,6 @@
 # @Site : 
 # @File : dev_bot.py
 # @Software: PyCharm
-
 import os
 import discord
 from discord.ext import commands
@@ -14,29 +13,30 @@ from discord.utils import get
 from discord import FFmpegPCMAudio
 from asyncio import run_coroutine_threadsafe as rct
 from pytube import YouTube
-
 import asyncio
-def play_next(ctx, source):
-    if len(song_queue) >= 1:
-        del song_queue[0]
-        vc = get(bot.voice_clients, guild=ctx.guild)
-        vc.play(discord.FFmpegPCMAudio(source=source, after=lambda e: play_next(ctx)))
-        asyncio.run_coroutine_threadsafe(ctx.send("No more songs in queue."))
 
-def play_repeat(ctx, audio, msg, n):
+list = []
+def next_play(ctx):
+    if len(list) > 1:
+        del list[0]
+        vc = get(bot.voice_clients, guild=ctx.guild)
+        vc.play(FFmpegPCMAudio(list[0]), after=lambda e: next_play(ctx))
+        vc.is_playing()
+    else:
+        return
+def repeat_play(ctx, audio, msg, n):
     if 0!=n:
         n = int(n)
         voice = get(bot.voice_clients, guild=ctx.guild)
         rct(msg.edit(content=f'Finished playing the song, {n} more to go.'), bot.loop)
-        voice.play(FFmpegPCMAudio(audio), after=lambda e: play_repeat(ctx, audio, msg, n-1))
+        voice.play(FFmpegPCMAudio(audio), after=lambda e: repeat_play(ctx, audio, msg, n-1))
         voice.is_playing()
     else:
         rct(msg.delete(), bot.loop)
-
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN_DEV_BOT')
+TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
-song_queue = []
+
 
 
 bot = commands.Bot(command_prefix='=')
@@ -49,6 +49,12 @@ async def on_ready():
     game = discord.Game('機...油..好...難...喝...逼逼逼逼')
     await bot.change_presence(status=discord.Status.idle, activity=game)
     print('------')
+@bot.command(aliases=['stop'])
+async def stop_play(ctx):
+    """ Skip the song currently playing. """
+    voice=get(bot.voice_clients, guild=ctx.guild)
+    if voice.is_playing():
+        voice.stop()
 @bot.command(aliases=['g'])
 async def grab(ctx,url,title):
     YouTube(url).streams.first().download(output_path='mp3/', filename=f'{title}.3gpp')
@@ -81,25 +87,41 @@ async def repeat(ctx, title, n):
     else:
         voice = await channel.connect()
     msg = await ctx.send(f'Started playing video {n} times')
-    voice.play(FFmpegPCMAudio(audio), after=lambda e: play_repeat(ctx, audio, msg, n-1))
+    voice.play(FFmpegPCMAudio(audio), after=lambda e: repeat_play(ctx, audio, msg, n-1))
     voice.is_playing()
+@bot.command(aliases=['np'])
+async def newplay(ctx, song):
+    channel = ctx.message.author.voice.channel
+    voice = get(bot.voice_clients, guild=ctx.guild)
+    source=f'mp3/{song}.3gpp'
+    list.append(source)
+    if voice and voice.is_connected():
+        await voice.move_to(channel)
+    else:
+        voice = await channel.connect()
+    if not voice.is_playing():
+        voice.play(FFmpegPCMAudio(source), after=lambda e: next_play(ctx))
+    else:
+        await ctx.send('Song queued')
 @bot.command(aliases=['p'])
 async def play(ctx, song):
     channel = ctx.message.author.voice.channel
     voice = get(bot.voice_clients, guild=ctx.guild)
     audio=f'mp3/{song}.3gpp'
-    song_queue.append(audio)
-    if voice.is_playing():
-        return await(ctx.send('send to queue!'))
+    list.append(audio)
     if voice and voice.is_connected():
         await voice.move_to(channel)
     else:
-        voice = await channel.connect()
-    voice.play(FFmpegPCMAudio(audio), after=lambda e: play_next(ctx))
-
-@bot.command()
-async def queue(ctx):
-    return await(ctx.send(song_queue))
+        voice = await channel.connect()      
+    if voice.is_playing():
+        await newplay(ctx,song)
+    next_play(ctx)
+@bot.command(aliases=['list'])
+async def List(ctx):
+    stringa=""
+    for x in list:
+        stringa+=x+"\n"
+    await ctx.send(stringa)
 @bot.command()
 async def multiply(ctx, a: eval, b: eval):
     await ctx.send(a*b)
@@ -111,7 +133,18 @@ async def greet(ctx):
 @bot.command()
 async def cat(ctx):
     await ctx.send("https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif")
+@bot.command()
+async def jwalk(ctx):
+    # 指定要列出所有檔案的目錄
+    mypath = "mp3/"
 
+    # 取得所有檔案與子目錄名稱
+    files = os.listdir(mypath)
+    x=""
+    # 以迴圈處理
+    for f in files:
+      x+=f[:-5]+"\n"
+    await ctx.send(x)
 @bot.command()
 async def info(ctx):
     embed = discord.Embed(title="島邊機器人", description="一個不起眼的島邊機器人", color=0xeee657)

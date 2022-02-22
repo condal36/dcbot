@@ -14,19 +14,28 @@ from discord import FFmpegPCMAudio
 from asyncio import run_coroutine_threadsafe as rct
 from pytube import YouTube
 
-def play_next(ctx, audio, msg, n):
+import asyncio
+def play_next(ctx, source):
+    if len(song_queue) >= 1:
+        del song_queue[0]
+        vc = get(bot.voice_clients, guild=ctx.guild)
+        vc.play(discord.FFmpegPCMAudio(source=source, after=lambda e: play_next(ctx)))
+        asyncio.run_coroutine_threadsafe(ctx.send("No more songs in queue."))
+
+def play_repeat(ctx, audio, msg, n):
     if 0!=n:
         n = int(n)
         voice = get(bot.voice_clients, guild=ctx.guild)
         rct(msg.edit(content=f'Finished playing the song, {n} more to go.'), bot.loop)
-        voice.play(FFmpegPCMAudio(audio), after=lambda e: play_next(ctx, audio, msg, n-1))
+        voice.play(FFmpegPCMAudio(audio), after=lambda e: play_repeat(ctx, audio, msg, n-1))
         voice.is_playing()
     else:
         rct(msg.delete(), bot.loop)
+
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
-
+song_queue = []
 
 
 bot = commands.Bot(command_prefix='=')
@@ -71,19 +80,25 @@ async def repeat(ctx, title, n):
     else:
         voice = await channel.connect()
     msg = await ctx.send(f'Started playing video {n} times')
-    voice.play(FFmpegPCMAudio(audio), after=lambda e: play_next(ctx, audio, msg, n-1))
+    voice.play(FFmpegPCMAudio(audio), after=lambda e: play_repeat(ctx, audio, msg, n-1))
     voice.is_playing()
 @bot.command(aliases=['p'])
 async def play(ctx, song):
     channel = ctx.message.author.voice.channel
     voice = get(bot.voice_clients, guild=ctx.guild)
     audio=f'mp3/{song}.3gpp'
+    song_queue.append(audio)
+    if voice.is_playing():
+        return await(ctx.send('send to queue!'))
     if voice and voice.is_connected():
         await voice.move_to(channel)
     else:
         voice = await channel.connect()
-    voice.play(FFmpegPCMAudio(audio))
-    voice.is_playing()
+    voice.play(FFmpegPCMAudio(audio), after=lambda e: play_next(ctx))
+
+@bot.command()
+async def queue(ctx):
+    return await(ctx.send(song_queue))
 @bot.command()
 async def multiply(ctx, a: eval, b: eval):
     await ctx.send(a*b)
