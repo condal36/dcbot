@@ -57,7 +57,11 @@ async def grab(ctx,url,title):
     YouTube(url).streams.first().download(output_path='mp3/', filename=f'{title}.3gpp')
     audio=f'mp3/{title}.3gpp'
     list.append(audio)
-    await ctx.send(f'Download {title} ok,Queued!')
+    if voice.is_playing():
+        return await(ctx.send(f'Download {title} ok,Queued!'))
+    else:
+    song_queue.pop()
+    voice.play(FFmpegPCMAudio(audio), after=lambda e: play_next(ctx))
 @bot.command()
 async def add(ctx, a:eval,b:eval):
     await ctx.send(a+b)
