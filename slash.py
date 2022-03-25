@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time : 2022/3/25 下午 00:53
+# @Time : 2022/2/19 下午 07:27
 # @Author : condal36
 # @Site :
-# @Version: v1.0.2.2
+# @Version: v1.0.1.3
 # @File : enlinebot_command.py
 # @Software: PyCharm
-import os
 import discord
-from discord.ext import commands
+import os
 from dotenv import load_dotenv
+from discord.ext import commands
 from discord.utils import get
 from discord import FFmpegPCMAudio
 from asyncio import run_coroutine_threadsafe as rct
@@ -19,30 +19,9 @@ import asyncio
 song_queue=[]
 HelpMessage=''
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
-bot = commands.Bot(command_prefix='=')      
-songlist=[]
-
-def updatesonglist():
-    mypath = "mp3/"
-    files = os.listdir(mypath)
-    titlelist=[]
-    totaltile=""
-    x=""
-    for f in files:
-      x+=f[:-5]+','
-      if(len(x)>50):
-        x+='\n'
-        titlelist.append(x)
-        x=""
-    titlelistlen=len(titlelist)-1
-    for titlestring in titlelist:
-        if(len(totaltile+titlestring)>=2000):
-            songlist.append(totaltile)
-            totaltile=""
-        totaltile+=titlestring
-        if(titlestring==titlelist[-1]):
-            songlist.append(totaltile)
+TOKEN = os.getenv('DISCORD_TEST')
+bot = discord.Bot(command_prefix='=')      
+guilds_id=[]
 #mian..
 def ParameterSplit(inputpara):
     return inputpara.split(",")
@@ -71,7 +50,7 @@ async def on_ready():
     game = discord.Game('機...油..好...難...喝...逼逼逼逼')
     await bot.change_presence(status=discord.Status.idle, activity=game)
     print('------')
-@bot.command(aliases=['stop'])
+@bot.slash_command(guild_ids=guilds_id,aliases=['stop'])
 async def stop_play(ctx):
     if not 'dj' in [y.name.lower() for y in ctx.message.author.roles]:
         return
@@ -79,8 +58,8 @@ async def stop_play(ctx):
     voice=get(bot.voice_clients, guild=ctx.guild)
     if voice.is_playing():
         voice.stop()
-@bot.command(aliases=['qn','insert'])
-async def QueueNext(ctx,title):
+@bot.slash_command(guild_ids=guilds_id,aliases=['qn','insert','cutin'])
+async def cutinsong(ctx,title):
     if not 'dj' in [y.name.lower() for y in ctx.message.author.roles]:
         return
     audio=f'mp3/{title}.3gpp'
@@ -91,9 +70,9 @@ async def QueueNext(ctx,title):
       else:
         song_queue.insert(0,audio)
     else:
-      return await(ctx.send(f'Isn\'t Played!'))
+      return await(ctx.respond(f'Isn\'t Played!'))
 
-@bot.command(aliases=['skip'])
+@bot.slash_command(guild_ids=guilds_id,aliases=['skip'])
 async def skip_song(ctx):
     if not 'dj' in [y.name.lower() for y in ctx.message.author.roles]:
         return
@@ -104,13 +83,13 @@ async def skip_song(ctx):
         voice.stop()
         voice.play(FFmpegPCMAudio(song_queue(0)),after=lambda e: play_next(ctx))
     print(f"After Skip Queue is {song_queue}")
-@bot.command(aliases=['skip2'])
+@bot.slash_command(guild_ids=guilds_id,aliases=['skip2'])
 async def skip_song_to(ctx,n):
     if not 'dj' in [y.name.lower() for y in ctx.message.author.roles]:
         return
     n=int(n)
     if(n>=len(song_queue)):
-        return await(ctx.send('Invalid input'))
+        return await(ctx.respond('Invalid input'))
     i=1;
     while(i<n):
         i+=1
@@ -121,7 +100,7 @@ async def skip_song_to(ctx,n):
         voice.stop()
         voice.play(FFmpegPCMAudio(song_queue(0)),after=lambda e: play_next(ctx))
 
-@bot.command(aliases=['g'])
+@bot.slash_command(guild_ids=guilds_id)
 async def grab(ctx,url,title):
     YouTube(url).streams.first().download(output_path='mp3/', filename=f'{title}.3gpp')
     audio=f'mp3/{title}.3gpp'
@@ -133,26 +112,24 @@ async def grab(ctx,url,title):
     else:
         voice = await channel.connect()
     if voice.is_playing():
-        await(ctx.send(f'Download {title} ok,Queued!'))
+        await(ctx.respond(f'Download {title} ok,Queued!'))
     else:
-        await(ctx.send(f'Download {title} ok, start to play!'))
+        await(ctx.respond(f'Download {title} ok, start to play!'))
         song_queue.pop(0)
         voice.play(FFmpegPCMAudio(audio), after=lambda e: play_next(ctx))
-@bot.command()
-async def add(ctx, a:eval,b:eval):
-    await ctx.send(a+b)
-@bot.command(pass_context=True)
+
+@bot.slash_command(guild_ids=guilds_id,pass_context=True)
 async def join(ctx):
     channel = ctx.message.author.voice.channel
     if not channel:
-        await ctx.send("You are not connected to a voice channel")
+        await ctx.respond("You are not connected to a voice channel")
         return
     voice = get(bot.voice_clients, guild=ctx.guild)
     if voice and voice.is_connected():
         await voice.move_to(channel)
     else:
         voice = await channel.connect()
-@bot.command()
+@bot.slash_command(guild_ids=guilds_id)
 async def repeat(ctx, title, n):
     channel = ctx.message.author.voice.channel
     n=int(n)
@@ -162,10 +139,10 @@ async def repeat(ctx, title, n):
         await voice.move_to(channel)
     else:
         voice = await channel.connect()
-    msg = await ctx.send(f'Started playing video {n} times')
+    msg = await ctx.respond(f'Started playing video {n} times')
     voice.play(FFmpegPCMAudio(audio), after=lambda e: play_repeat(ctx, audio, msg, n-1))
     voice.is_playing()
-@bot.command(aliases=['p','newplay','np'])
+@bot.slash_command(guild_ids=guilds_id,aliases=['p','newplay','np'])
 async def play(ctx, song):
     channel = ctx.message.author.voice.channel
     voice = get(bot.voice_clients, guild=ctx.guild)
@@ -176,16 +153,16 @@ async def play(ctx, song):
     else:
         voice = await channel.connect()
     if voice.is_playing():
-        return await(ctx.send(f'{song} Queued!'))
+        return await(ctx.respond(f'{song} Queued!'))
     else:
         song_queue.pop(0)
         voice.play(FFmpegPCMAudio(audio), after=lambda e: play_next(ctx))
-@bot.command(aliases=['aq'])
-async def AddQueue(ctx,*AddQue):
+@bot.slash_command(guild_ids=guilds_id,aliases=['aq'])
+async def addqueue(ctx,*addque):
     channel = ctx.message.author.voice.channel
     voice = get(bot.voice_clients, guild=ctx.guild)
-    print(AddQue)
-    for StrSong in AddQue:
+    print(addque)
+    for StrSong in addque:
         song_queue.append(f'mp3/{StrSong}.3gpp')
         print(StrSong+"now queue is ")
         print(song_queue)
@@ -194,12 +171,12 @@ async def AddQueue(ctx,*AddQue):
     else:
         voice = await channel.connect()
     if voice.is_playing():
-        return await(ctx.send(f'SongList Queued!'))
+        return await(ctx.respond(f'SongList Queued!'))
     else:
         voice.play(FFmpegPCMAudio(song_queue.pop(0)), after=lambda e: play_next(ctx))
-        return await(ctx.send(f'SongList Played!'))
-@bot.command(aliases=['pl'])
-async def AddPlayList(ctx,playlist):
+        return await(ctx.respond(f'SongList Played!'))
+@bot.slash_command(guild_ids=guilds_id,aliases=['pl'])
+async def addplaylist(ctx,playlist):
     channel = ctx.message.author.voice.channel
     voice = get(bot.voice_clients, guild=ctx.guild)
     for StrSong in ParameterSplit(playlist):
@@ -209,12 +186,12 @@ async def AddPlayList(ctx,playlist):
     else:
         voice = await channel.connect()
     if voice.is_playing():
-        return await(ctx.send(f'SongList Queued!'))
+        return await(ctx.respond(f'SongList Queued!'))
     else:
         voice.play(FFmpegPCMAudio(song_queue.pop(0)), after=lambda e: play_next(ctx))
-        return await(ctx.send(f'SongList Played!'))
-@bot.command(aliases=['q'])
-async def Queue(ctx):
+        return await(ctx.respond(f'SongList Played!'))
+@bot.slash_command(guild_ids=guilds_id,aliases=['q'])
+async def showqueue(ctx):
     SongQueueList=""
     if song_queue:
         tmp=0
@@ -225,38 +202,44 @@ async def Queue(ctx):
             else:
                 tmp += 1
                 SongQueueList+=f"{tmp}."+x[4:-5]+"  "
-        await ctx.send(SongQueueList)
+        await ctx.respond(SongQueueList)
     else:
-        await ctx.send('Nothing')
-@bot.command(aliases=['rm'])
-async def Remove(ctx,n):
+        await ctx.respond('Nothing')
+@bot.slash_command(guild_ids=guilds_id,aliases=['rm'])
+async def removequeue(ctx,n):
     n=int(n)-1
     if(n<0):
-        await ctx.send('invalid input')
+        await ctx.respond('invalid input')
     else:
     	if song_queue[n]:
             song_queue.pop(n)
     	else:
-            await ctx.send('Nothing at n!')
-@bot.command()
-async def multiply(ctx, a: eval, b: eval):
-    await ctx.send(a*b)
+            await ctx.respond('Nothing at n!')
 
-@bot.command()
+@bot.slash_command(guild_ids=guilds_id)
 async def greet(ctx):
-    await ctx.send(":smiley: :wave: Hello, there!")
+    await ctx.respond(":smiley: :wave: Hello, there!")
 
-@bot.command()
+@bot.slash_command(guild_ids=guilds_id)
 async def cat(ctx):
-    await ctx.send("https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif")
-@bot.command()
+    await ctx.respond("https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif")
+@bot.slash_command(guild_ids=guilds_id)
 async def jwalk(ctx):
-    updatesonglist()
-    global songlist
-    while songlist:
-        await ctx.send(songlist.pop(0))
-    
-@bot.command()
+    mypath = "mp3/"
+    files = os.listdir(mypath)
+    titlelist=[]
+    totaltile=""
+    x=""
+    for f in files:
+      x+=f[:-5]+','
+      if(len(x)>50):
+        x+='\n'
+        titlelist.append(x)
+        x=""
+    for titlestring in titlelist:
+        totaltile+=titlestring
+    await ctx.respond(totaltile)
+@bot.slash_command(guild_ids=guilds_id)
 async def info(ctx):
     embed = discord.Embed(title="enlinBot", description="嬰靈會唱歌", color=0xeee657)
 
@@ -269,10 +252,14 @@ async def info(ctx):
     # give users a link to invite this bot to their server
     embed.add_field(name="Invite", value="[Invitelink]https://discord.com/api/oauth2/authorize?client_id=944498354530942976&permissions=8&scope=bot")
 
-    await ctx.send(embed=embed)
-bot.remove_command('help')
-@bot.command()
-async def help(ctx):
+    await ctx.respond(embed=embed)
+
+@bot.slash_command(guild_ids=guilds_id)
+async def hello(ctx):
+    await ctx.respond("Hello!")
+
+@bot.slash_command(guild_ids=guilds_id,)
+async def helptest(ctx):
     HelpMessage = '```'
     HelpMessage +='\n=greet     :  Gives a nice greet message  Example:=greet'
     HelpMessage +='\n=cat       :  Gives a cute cat gif to lighten up the mood.  Example:=cat'
@@ -289,7 +276,7 @@ async def help(ctx):
     HelpMessage +='\n=Remove    :  Remove the n\'th song in the Queue(=rm)  Example:=Remove n'
     HelpMessage +='\n=QueueNext    :  Play the song after now playing(=qn)(DJ role)  Example:=QueueNext song'
     HelpMessage += '```'
-    await ctx.send(HelpMessage)
+    await ctx.respond(HelpMessage)
 
 @bot.event
 async def on_error(event, *args, **kwargs):
@@ -300,3 +287,5 @@ async def on_error(event, *args, **kwargs):
             raise
 
 bot.run(TOKEN)
+
+
